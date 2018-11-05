@@ -126,7 +126,7 @@ public class MainFrame extends JFrame {
                     //---- initialBtn ----
                     initialBtn.setText("\u521d\u59cb\u8bbe\u7f6e");
                     panel3.add(initialBtn);
-                    initialBtn.setBounds(new Rectangle(new Point(525, 15), initialBtn.getPreferredSize()));
+                    initialBtn.setBounds(new Rectangle(new Point(530, 15), initialBtn.getPreferredSize()));
                     panel3.add(memoryJFT);
                     memoryJFT.setBounds(100, 20, 60, 30);
                     panel3.add(printerJFT);
@@ -364,10 +364,10 @@ public class MainFrame extends JFrame {
                         scrollPane2.setViewportView(readyProcessTable);
                     }
                     panel7.add(scrollPane2);
-                    scrollPane2.setBounds(10, 30, 615, 85);
+                    scrollPane2.setBounds(10, 30, 615, 100);
                 }
                 createProcessPanel.add(panel7);
-                panel7.setBounds(5, 290, 715, 120);
+                panel7.setBounds(5, 285, 715, 140);
 
                 //======== panel8 ========
                 {
@@ -393,17 +393,17 @@ public class MainFrame extends JFrame {
                     wakeBtn.setBounds(640, 50, 63, wakeBtn.getPreferredSize().height);
                 }
                 createProcessPanel.add(panel8);
-                panel8.setBounds(5, 405, 715, 120);
+                panel8.setBounds(5, 420, 715, 125);
 
                 //---- resetBtn ----
                 resetBtn.setText("\u91cd\u7f6e");
                 createProcessPanel.add(resetBtn);
-                resetBtn.setBounds(455, 535, 90, 35);
+                resetBtn.setBounds(455, 555, 75, 30);
 
                 //---- exitBtn ----
                 exitBtn.setText("\u9000\u51fa");
                 createProcessPanel.add(exitBtn);
-                exitBtn.setBounds(565, 535, 90, 35);
+                exitBtn.setBounds(565, 555, 75, 30);
 
                 { // compute preferred size
                     Dimension preferredSize = new Dimension();
@@ -431,8 +431,9 @@ public class MainFrame extends JFrame {
 
                     //---- label16 ----
                     label16.setText("\u8f93\u5165\u8fdb\u7a0b\u961f\u5217\u60c5\u51b5\uff1a");
+                    label16.setFont(new Font("Microsoft YaHei UI", Font.PLAIN, 14));
                     panel1.add(label16);
-                    label16.setBounds(15, 10, 120, 30);
+                    label16.setBounds(10, 10, 155, 30);
 
                     //======== scrollPane4 ========
                     {
@@ -450,8 +451,9 @@ public class MainFrame extends JFrame {
 
                     //---- label17 ----
                     label17.setText("\u6267\u884c\u540e\u8fdb\u7a0b\u961f\u5217\u60c5\u51b5\uff1a");
+                    label17.setFont(new Font("Microsoft YaHei UI", Font.PLAIN, 14));
                     panel9.add(label17);
-                    label17.setBounds(15, 0, 160, 30);
+                    label17.setBounds(25, 0, 160, 30);
 
                     //======== scrollPane5 ========
                     {
@@ -500,7 +502,7 @@ public class MainFrame extends JFrame {
             mainTabbedPane.addTab("\u7ed3\u679c\u9884\u89c8", panel2);
         }
         contentPane.add(mainTabbedPane);
-        mainTabbedPane.setBounds(0, 0, 720, 625);
+        mainTabbedPane.setBounds(0, 0, 730, 625);
 
         { // compute preferred size
             Dimension preferredSize = new Dimension();

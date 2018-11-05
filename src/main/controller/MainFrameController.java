@@ -13,6 +13,7 @@ import main.view.MainFrame;
 import javax.swing.*;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableModel;
 import java.awt.*;
@@ -107,13 +108,13 @@ public class MainFrameController {
                 currentTimeJFT.setText(String.valueOf(currentTime));
                 // 处理到达的进程
                 while (tempProcessQueue.size() > 0) {
-                    if (tempProcessQueue.get(0).getArriveTime() == currentTime) {
+                    if (tempProcessQueue.get(0).getArriveTime() <= currentTime) {
                         if (selectNoGrab.isSelected()) {
                             // 非抢占式优先级调度
                             ProcessData process = tempProcessQueue.remove(0);
                             noGrabDispatch(process);
                         } else if (selectGrab.isSelected()) {
-                            // 抢占式优先级 -- 引发进程调度
+                            // 抢占式优先级调度
                             ProcessData process = tempProcessQueue.remove(0);
                             grabDispatch(process);
                         }
@@ -138,7 +139,7 @@ public class MainFrameController {
                         printerNum += currentProcess.getPrinterReq();
 
                         currentProcess = null;
-                        // 有进程执行完毕 --》 调度就绪队列队首进程
+                        // 有进程执行完毕 进行进程调度 --》 调度就绪队列队首进程
                         if (readyProcessQueue.size() > 0) {
                             dispatchQueueFirst();
                         }
@@ -193,6 +194,7 @@ public class MainFrameController {
         process.setStatus(ProcessStatus.READY);
         readyProcessQueue.add(process);
         ProcessSort.sortByPriority(readyProcessQueue);
+
     }
 
     /**
@@ -252,6 +254,9 @@ public class MainFrameController {
                 } else if (printerReq > printerNum) {
                     JOptionPane.showMessageDialog(null, "当前打印机数不足，创建进程失败!");
                     return;
+                } else if (arrive_time < currentTime) {
+                    JOptionPane.showMessageDialog(null, "到达时间需大于等于当前时间，创建进程失败!");
+                    return;
                 }
 
                 // 分配资源
@@ -273,6 +278,8 @@ public class MainFrameController {
                 memoryReqJFT.setText("");
                 printerReqJFT.setText("");
                 priorityJFT.setText("");
+                currentMemoryJFT.setText(String.valueOf(memorySize));
+                currentPrinterJFT.setText(String.valueOf(printerNum));
             }
         });
 
@@ -282,6 +289,8 @@ public class MainFrameController {
             public void actionPerformed(ActionEvent e) {
                 memorySize = Integer.parseInt(memoryJFT.getText());
                 printerNum = Integer.parseInt(printerJFT.getText());
+                currentMemoryJFT.setText(String.valueOf(memorySize));
+                currentPrinterJFT.setText(String.valueOf(printerNum));
             }
         });
 
@@ -312,17 +321,18 @@ public class MainFrameController {
         blockBtn.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                // 将状态置为阻塞
-                currentProcess.setStatus(ProcessStatus.BLOCKED);
-                blockProcessQueue.add(currentProcess);
-                blockProcessTableModel.setProcessQueue(blockProcessQueue);
-                blockProcessTable.updateUI();
-                currentProcess = null;
-                // 阻塞后当前进程为空 -- 调度队首进程
-                dispatchQueueFirst();
-                curProcessTableModel.setCurrentProcess(currentProcess);
-                currentProcessTable.updateUI();
-
+                if(currentProcess != null){
+                    // 将状态置为阻塞
+                    currentProcess.setStatus(ProcessStatus.BLOCKED);
+                    blockProcessQueue.add(currentProcess);
+                    blockProcessTableModel.setProcessQueue(blockProcessQueue);
+                    blockProcessTable.updateUI();
+                    currentProcess = null;
+                    // 阻塞后当前进程为空 -- 调度队首进程
+                    dispatchQueueFirst();
+                    curProcessTableModel.setCurrentProcess(currentProcess);
+                    currentProcessTable.updateUI();
+                }
             }
         });
         wakeBtn.addActionListener(new ActionListener() {
@@ -333,7 +343,7 @@ public class MainFrameController {
                 if (selectNoGrab.isSelected()) {
                     // 非抢占式优先级调度
                     noGrabDispatch(process);
-                } else if(selectGrab.isSelected()) {
+                } else if (selectGrab.isSelected()) {
                     // 抢占式优先级
                     grabDispatch(process);
                 }
@@ -417,27 +427,45 @@ public class MainFrameController {
             @Override
             public void actionPerformed(ActionEvent e) {
 
-                File file = new File("./src/testFile/test.txt");
-                try {
-                    BufferedReader bufferedReader = new BufferedReader(new FileReader(file));
-                    String tempString;
-                    while ((tempString = bufferedReader.readLine()) != null) {
-                        String[] processMsg = tempString.split(" ");
-                        // 创建进程对象
-                        ProcessData processData = new ProcessData(processMsg[0], Integer.parseInt(processMsg[1]),
-                                Integer.parseInt(processMsg[2]), Integer.parseInt(processMsg[3]), 0, 0);
-                        tempProcessQueue.add(processData);
-                        // 到达时间排序
-                        ProcessSort.sortByArriveTime(tempProcessQueue);
-                        // 添加到输入table
-                        inputProcessTableModel.addProcess(processData);
-                    }
-                } catch (FileNotFoundException e1) {
-                    e1.printStackTrace();
-                } catch (IOException e1) {
-                    e1.printStackTrace();
-                }
+                JFileChooser fileChooser = new JFileChooser();
+                fileChooser.setCurrentDirectory(new File("."));
+                fileChooser.setDialogTitle("打开");
 
+                FileNameExtensionFilter filter = new FileNameExtensionFilter("Text Files ", "txt");
+                fileChooser.setFileFilter(filter);
+                fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+                fileChooser.setAcceptAllFileFilterUsed(false);
+
+                if (fileChooser.showSaveDialog(mainFrame) == JFileChooser.APPROVE_OPTION) {
+                    File path = fileChooser.getSelectedFile();
+                    BufferedReader bufferedReader = null;
+                    try {
+                        bufferedReader = new BufferedReader(new FileReader(path));
+                        String tempString;
+                        while ((tempString = bufferedReader.readLine()) != null) {
+                            String[] processMsg = tempString.split(" ");
+                            // 创建进程对象
+                            ProcessData processData = new ProcessData(processMsg[0], Integer.parseInt(processMsg[1]),
+                                    Integer.parseInt(processMsg[2]), Integer.parseInt(processMsg[3]), Integer.parseInt(processMsg[4]), Integer.parseInt(processMsg[5]));
+                            tempProcessQueue.add(processData);
+                            memorySize -= Integer.parseInt(processMsg[4]);
+                            printerNum -= Integer.parseInt(processMsg[5]);
+                            // 到达时间排序
+                            ProcessSort.sortByArriveTime(tempProcessQueue);
+                            // 添加到输入table
+                            inputProcessTableModel.addProcess(processData);
+
+                            currentMemoryJFT.setText(String.valueOf(memorySize));
+                            currentPrinterJFT.setText(String.valueOf(printerNum));
+
+                        }
+                    } catch (FileNotFoundException e1) {
+                        e1.printStackTrace();
+                    } catch (IOException e1) {
+                        e1.printStackTrace();
+                    }
+
+                }
             }
         });
 

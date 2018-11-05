@@ -17,6 +17,7 @@ public class CurProcessTableModel extends AbstractTableModel {
         this.currentProcess = currentProcess;
     }
 
+
     @Override
     public int getRowCount() {
         if(currentProcess!=null)
