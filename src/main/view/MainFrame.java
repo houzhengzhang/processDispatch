@@ -431,9 +431,9 @@ public class MainFrame extends JFrame {
 
                     //---- label16 ----
                     label16.setText("\u8f93\u5165\u8fdb\u7a0b\u961f\u5217\u60c5\u51b5\uff1a");
-                    label16.setFont(new Font("Microsoft YaHei UI", Font.PLAIN, 14));
+                    label16.setFont(new Font("Microsoft YaHei UI", Font.PLAIN, 16));
                     panel1.add(label16);
-                    label16.setBounds(10, 10, 155, 30);
+                    label16.setBounds(10, 5, 155, 30);
 
                     //======== scrollPane4 ========
                     {
@@ -451,7 +451,7 @@ public class MainFrame extends JFrame {
 
                     //---- label17 ----
                     label17.setText("\u6267\u884c\u540e\u8fdb\u7a0b\u961f\u5217\u60c5\u51b5\uff1a");
-                    label17.setFont(new Font("Microsoft YaHei UI", Font.PLAIN, 14));
+                    label17.setFont(new Font("Microsoft YaHei UI", Font.PLAIN, 16));
                     panel9.add(label17);
                     label17.setBounds(25, 0, 160, 30);
 

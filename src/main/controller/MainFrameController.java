@@ -74,7 +74,7 @@ public class MainFrameController {
     private OutputProcessTableModel outputProcessTableModel = new OutputProcessTableModel();
 
     // 当前时间
-    private int currentTime = -1;
+    volatile private int currentTime;
     // 就绪队列
     private List<ProcessData> readyProcessQueue = new ArrayList<>();
     // 阻塞队列
@@ -87,9 +87,11 @@ public class MainFrameController {
     // 当前执行进程
     private ProcessData currentProcess = null;
     // 内存大小
-    private int memorySize = 0;
+    private int totalMemorySize = 0;
+    private int curMemorySize = 0;
     // 打印机数目
-    private int printerNum = 0;
+    private int totalPrinterNum = 0;
+    private int curPrinterNum = 0;
     // 时钟
     private Timer timer;
 
@@ -100,26 +102,42 @@ public class MainFrameController {
 
         // 定义时钟
         timer = new Timer(1000, new ActionListener() {
+
             @Override
             public void actionPerformed(ActionEvent e) {
-                // 定时器加1
-                currentTime += 1;
-
-                currentTimeJFT.setText(String.valueOf(currentTime));
+                // 当前进程剩余执行时间减一
+                if (currentProcess != null)
+                    currentProcess.subMoreTime();
+                // 暂时记录因资源不足暂时无法创建的进程
+                List<ProcessData> processDataList = new ArrayList<>();
                 // 处理到达的进程
                 while (tempProcessQueue.size() > 0) {
                     if (tempProcessQueue.get(0).getArriveTime() <= currentTime) {
-                        if (selectNoGrab.isSelected()) {
-                            // 非抢占式优先级调度
-                            ProcessData process = tempProcessQueue.remove(0);
-                            noGrabDispatch(process);
-                        } else if (selectGrab.isSelected()) {
-                            // 抢占式优先级调度
-                            ProcessData process = tempProcessQueue.remove(0);
-                            grabDispatch(process);
+                        // 首先为到达进程分配资源，如资源不够则继续等待
+                        if (curMemorySize >= tempProcessQueue.get(0).getMemoryReq() && curPrinterNum >= tempProcessQueue.get(0).getPrinterReq()) {
+                            curMemorySize -= tempProcessQueue.get(0).getMemoryReq();
+                            curPrinterNum -= tempProcessQueue.get(0).getPrinterReq();
+                            if (selectNoGrab.isSelected()) {
+                                // 非抢占式优先级调度
+                                ProcessData process = tempProcessQueue.remove(0);
+                                noGrabDispatch(process);
+                            } else if (selectGrab.isSelected()) {
+                                // 抢占式优先级调度
+                                ProcessData process = tempProcessQueue.remove(0);
+                                grabDispatch(process);
+                            }
+                        } else {
+                            processDataList.add(tempProcessQueue.remove(0));
                         }
                     } else break;
                 }
+                // 处理队列中元素
+                while (!processDataList.isEmpty()) {
+                    tempProcessQueue.add(processDataList.remove(0));
+                }
+                // 重新按到达时间排序
+                ProcessSort.sortByArriveTime(tempProcessQueue);
+
                 // 当前cpu空闲直接取就绪队列队首进程
                 if (currentProcess == null) {
                     if (readyProcessQueue.size() > 0) {
@@ -135,23 +153,42 @@ public class MainFrameController {
                         // 记录已完成进程
                         finishProcessList.add(currentProcess);
                         // 归还资源
-                        memorySize += currentProcess.getMemoryReq();
-                        printerNum += currentProcess.getPrinterReq();
+                        curMemorySize += currentProcess.getMemoryReq();
+                        curPrinterNum += currentProcess.getPrinterReq();
 
                         currentProcess = null;
-                        // 有进程执行完毕 进行进程调度 --》 调度就绪队列队首进程
+                        // 有进程执行完毕 引发进程调度
+                        while (tempProcessQueue.size() > 0) {
+                            if (tempProcessQueue.get(0).getArriveTime() <= currentTime) {
+                                // 首先为到达进程分配资源，如资源不够则继续等待
+                                if (curMemorySize >= tempProcessQueue.get(0).getMemoryReq() && curPrinterNum >= tempProcessQueue.get(0).getPrinterReq()) {
+                                    curMemorySize -= tempProcessQueue.get(0).getMemoryReq();
+                                    curPrinterNum -= tempProcessQueue.get(0).getPrinterReq();
+                                    if (selectNoGrab.isSelected()) {
+                                        // 非抢占式优先级调度
+                                        ProcessData process = tempProcessQueue.remove(0);
+                                        noGrabDispatch(process);
+                                    } else if (selectGrab.isSelected()) {
+                                        // 抢占式优先级调度
+                                        ProcessData process = tempProcessQueue.remove(0);
+                                        grabDispatch(process);
+                                    }
+                                } else break;
+                            } else break;
+                        }
+
                         if (readyProcessQueue.size() > 0) {
                             dispatchQueueFirst();
                         }
                     }
                 }
-                // 当前进程剩余执行时间减一
-                if (currentProcess != null)
-                    currentProcess.subMoreTime();
 
-                currentMemoryJFT.setText(String.valueOf(memorySize));
-                currentPrinterJFT.setText(String.valueOf(printerNum));
 
+                currentMemoryJFT.setText(String.valueOf(curMemorySize));
+                currentPrinterJFT.setText(String.valueOf(curPrinterNum));
+
+                // 更新界面当前时间
+                currentTimeJFT.setText(String.valueOf(currentTime));
                 // 更新table
                 readyProcessTableModel.setProcessQueue(readyProcessQueue);
                 curProcessTableModel.setCurrentProcess(currentProcess);
@@ -162,7 +199,11 @@ public class MainFrameController {
                 if (readyProcessQueue.size() == 0 && blockProcessQueue.size() == 0 && currentProcess == null && tempProcessQueue.size() == 0) {
                     JOptionPane.showMessageDialog(null, "所有进程已执行完毕！");
                     timer.stop();
+                    return;
                 }
+
+                // 定时器加1
+                currentTime += 1;
             }
         });
     }
@@ -241,6 +282,13 @@ public class MainFrameController {
         newProcessBtn.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
+                // 判断输入是否为空
+                if ("".equals(processNameJFT.getText()) || "".equals(arriveTimeJFT.getText()) ||
+                        "".equals(serveTimeJFT.getText()) || "".equals(printerJFT.getText()) || "".equals(memoryJFT.getText()) ||
+                        "".equals(printerJFT.getText())) {
+                    JOptionPane.showMessageDialog(null, "输入不能为空");
+                    return;
+                }
                 String processName = processNameJFT.getText();
                 int arrive_time = Integer.parseInt(arriveTimeJFT.getText());
                 int serve_time = Integer.parseInt(serveTimeJFT.getText());
@@ -248,20 +296,17 @@ public class MainFrameController {
                 int memoryReq = Integer.parseInt(memoryReqJFT.getText());
                 int printerReq = Integer.parseInt(printerReqJFT.getText());
 
-                if (memoryReq > memorySize) {
-                    JOptionPane.showMessageDialog(null, "当前内存空间不足，创建进程失败!");
+                if (memoryReq > totalMemorySize) {
+                    JOptionPane.showMessageDialog(null, "当前请求内存空间大于系统最大内存，创建进程失败!");
                     return;
-                } else if (printerReq > printerNum) {
-                    JOptionPane.showMessageDialog(null, "当前打印机数不足，创建进程失败!");
+                } else if (printerReq > totalPrinterNum) {
+                    JOptionPane.showMessageDialog(null, "当前请求打印机数大于系统打印机资源数，创建进程失败!");
                     return;
                 } else if (arrive_time < currentTime) {
                     JOptionPane.showMessageDialog(null, "到达时间需大于等于当前时间，创建进程失败!");
                     return;
                 }
 
-                // 分配资源
-                memorySize -= memoryReq;
-                printerNum -= printerReq;
                 // 创建进程对象
                 ProcessData processData = new ProcessData(processName, arrive_time, serve_time, priority, memoryReq, printerReq);
                 tempProcessQueue.add(processData);
@@ -278,8 +323,8 @@ public class MainFrameController {
                 memoryReqJFT.setText("");
                 printerReqJFT.setText("");
                 priorityJFT.setText("");
-                currentMemoryJFT.setText(String.valueOf(memorySize));
-                currentPrinterJFT.setText(String.valueOf(printerNum));
+                currentMemoryJFT.setText(String.valueOf(curMemorySize));
+                currentPrinterJFT.setText(String.valueOf(curPrinterNum));
             }
         });
 
@@ -287,10 +332,10 @@ public class MainFrameController {
         initialBtn.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                memorySize = Integer.parseInt(memoryJFT.getText());
-                printerNum = Integer.parseInt(printerJFT.getText());
-                currentMemoryJFT.setText(String.valueOf(memorySize));
-                currentPrinterJFT.setText(String.valueOf(printerNum));
+                totalMemorySize = curMemorySize = Integer.parseInt(memoryJFT.getText());
+                totalPrinterNum = curPrinterNum = Integer.parseInt(printerJFT.getText());
+                currentMemoryJFT.setText(String.valueOf(curMemorySize));
+                currentPrinterJFT.setText(String.valueOf(curPrinterNum));
             }
         });
 
@@ -321,14 +366,14 @@ public class MainFrameController {
         blockBtn.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if(currentProcess != null){
+                if (currentProcess != null) {
                     // 将状态置为阻塞
                     currentProcess.setStatus(ProcessStatus.BLOCKED);
                     blockProcessQueue.add(currentProcess);
                     blockProcessTableModel.setProcessQueue(blockProcessQueue);
                     blockProcessTable.updateUI();
                     currentProcess = null;
-                    // 阻塞后当前进程为空 -- 调度队首进程
+                    // 阻塞后当前进程为空 -- 可能引发进程调度
                     dispatchQueueFirst();
                     curProcessTableModel.setCurrentProcess(currentProcess);
                     currentProcessTable.updateUI();
@@ -339,17 +384,19 @@ public class MainFrameController {
             @Override
             public void actionPerformed(ActionEvent e) {
                 // 获取阻塞队列队首进程
-                ProcessData process = blockProcessQueue.remove(0);
-                if (selectNoGrab.isSelected()) {
-                    // 非抢占式优先级调度
-                    noGrabDispatch(process);
-                } else if (selectGrab.isSelected()) {
-                    // 抢占式优先级
-                    grabDispatch(process);
+                if (!blockProcessQueue.isEmpty()) {
+                    ProcessData process = blockProcessQueue.remove(0);
+                    if (selectNoGrab.isSelected()) {
+                        // 非抢占式优先级调度
+                        noGrabDispatch(process);
+                    } else if (selectGrab.isSelected()) {
+                        // 抢占式优先级
+                        grabDispatch(process);
+                    }
+                    // 重绘
+                    blockProcessTableModel.setProcessQueue(blockProcessQueue);
+                    blockProcessTable.updateUI();
                 }
-                // 重绘
-                blockProcessTableModel.setProcessQueue(blockProcessQueue);
-                blockProcessTable.updateUI();
             }
         });
 
@@ -363,8 +410,10 @@ public class MainFrameController {
                 tempProcessQueue.clear();
                 finishProcessList.clear();
                 currentProcess = null;
-                memorySize = 0;
-                printerNum = 0;
+                totalPrinterNum = 0;
+                totalMemorySize = 0;
+                curMemorySize = 0;
+                curPrinterNum = 0;
 
                 memoryJFT.setText("");
                 printerJFT.setText("");
@@ -382,8 +431,8 @@ public class MainFrameController {
                 inputProcessTableModel.clearProcess();
                 outputProcessTableModel.setProcessQueue(finishProcessList);
 
-                currentMemoryJFT.setText(String.valueOf(memorySize));
-                currentPrinterJFT.setText(String.valueOf(printerNum));
+                currentMemoryJFT.setText(String.valueOf(curMemorySize));
+                currentPrinterJFT.setText(String.valueOf(curPrinterNum));
 
                 mainFrame.validate();
                 mainFrame.repaint();
@@ -428,7 +477,7 @@ public class MainFrameController {
             public void actionPerformed(ActionEvent e) {
 
                 JFileChooser fileChooser = new JFileChooser();
-                fileChooser.setCurrentDirectory(new File("."));
+                fileChooser.setCurrentDirectory(new File("./src/testFile"));
                 fileChooser.setDialogTitle("打开");
 
                 FileNameExtensionFilter filter = new FileNameExtensionFilter("Text Files ", "txt");
@@ -447,16 +496,23 @@ public class MainFrameController {
                             // 创建进程对象
                             ProcessData processData = new ProcessData(processMsg[0], Integer.parseInt(processMsg[1]),
                                     Integer.parseInt(processMsg[2]), Integer.parseInt(processMsg[3]), Integer.parseInt(processMsg[4]), Integer.parseInt(processMsg[5]));
+
+                            if (processData.getPrinterReq() > totalPrinterNum) {
+                                JOptionPane.showMessageDialog(null, "进程 " + processData.getName() + "创建失败，因请求打印机数大于系统打印机资源数");
+                                continue;
+                            } else if (processData.getMemoryReq() > totalMemorySize) {
+                                JOptionPane.showMessageDialog(null, "进程 " + processData.getName() + "创建失败，因请求内存大小大于系统内存大小");
+                                continue;
+                            }
+                            // 添加至临时队列
                             tempProcessQueue.add(processData);
-                            memorySize -= Integer.parseInt(processMsg[4]);
-                            printerNum -= Integer.parseInt(processMsg[5]);
                             // 到达时间排序
                             ProcessSort.sortByArriveTime(tempProcessQueue);
                             // 添加到输入table
                             inputProcessTableModel.addProcess(processData);
 
-                            currentMemoryJFT.setText(String.valueOf(memorySize));
-                            currentPrinterJFT.setText(String.valueOf(printerNum));
+                            currentMemoryJFT.setText(String.valueOf(curMemorySize));
+                            currentPrinterJFT.setText(String.valueOf(curPrinterNum));
 
                         }
                     } catch (FileNotFoundException e1) {

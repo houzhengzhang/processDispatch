@@ -8,8 +8,9 @@ import main.utils.ProcessStatus;
  * @Description:
  */
 public class ProcessData {
+    private static int count=0;
     private String name;//进程名
-    private int ID;//进程标识数
+    private int id=0;//进程标识数
     private int arriveTime;//到达时间
     private int needTime;//服务时间
     private int prio;//进程优先数，数字越大优先级越高
@@ -33,6 +34,8 @@ public class ProcessData {
         moreTime = needTime;
         // 初始状态
         beginTime = -1;
+        id = count++;
+
     }
 
     public int getPrio() {
@@ -96,6 +99,10 @@ public class ProcessData {
             return true;
         else
             return false;
+    }
+
+    public int getId() {
+        return id;
     }
 
     public String toString(){
